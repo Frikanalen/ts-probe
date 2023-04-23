@@ -1,0 +1,4 @@
+requests
+av
+numpy
+prometheus_client

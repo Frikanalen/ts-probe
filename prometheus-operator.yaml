@@ -1,0 +1,124 @@
+apiVersion: monitoring.coreos.com/v1
+kind: Service
+metadata:
+  name: ts-probe
+  labels:
+    app: ts-probe
+  namespace: beta
+spec:
+  selector:
+    app: ts-probe
+  ports:
+  - name: web
+    port: 8000
+    protocol: TCP
+    targetPort: 8000
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: ts-probe
+  labels:
+    app: ts-probe
+  namespace: beta
+spec:
+  selector:
+    matchLabels:
+      app: ts-probe
+  endpoints:
+  - port: web
+    interval: 15s
+    path: /metrics
+    scheme: http
+    tlsConfig:
+      insecureSkipVerify: true
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ts-probe
+  namespace: beta
+spec:
+  selector:
+    matchLabels:
+      app: ts-probe
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: ts-probe
+      annotations:
+        linkerd.io/inject: enabled
+    spec:
+      containers:
+      - name: ts-probe
+        image: frikanalen/ts-probe:latest
+        ports:
+        - name: web
+          containerPort: 8000
+        env:
+        - name: VIDEO_URL
+          value: "http://your-stream-url.com"
+        readinessProbe:
+          httpGet:
+            path: /metrics
+            port: web
+            scheme: HTTP
+          initialDelaySeconds: 5
+          timeoutSeconds: 1
+          periodSeconds: 5
+          failureThreshold: 3
+        livenessProbe:
+          httpGet:
+            path: /metrics
+            port: web
+            scheme: HTTP
+          initialDelaySeconds: 10
+          timeoutSeconds: 1
+          periodSeconds: 30
+          failureThreshold: 3
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: ts-probe
+  namespace: beta
+spec:
+  groups:
+  - name: ts-probe-alerts
+    rules:
+    - alert: DarkVideoDetected
+      expr: avg(video_brightness) < 0.1
+      for: 2m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Dark video detected"
+        description: "The average video brightness is below 0.1."
+
+    - alert: NoMotionDetected
+      expr: motion_ratio == 0
+      for: 2m
+      labels:
+        severity: critical
+      annotations:
+        summary: "No motion detected"
+        description: "No motion has been detected in the video for the last 2 minutes."
+
+    - alert: FrozenVideoDetected
+      expr: ts_packet_rate == 0
+      for: 2m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Frozen video detected"
+        description: "No transport stream packets have been received for the last 2 minutes."
+
+    - alert: QuietAudioDetected
+      expr: avg(audio_amplitude_lufs) < -35.0
+      for: 2m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Quiet audio detected"
+        description: "The average audio loudness is below -35.0 LUFS."
