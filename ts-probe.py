@@ -18,7 +18,7 @@ bitrate_with_padding_gauge = Gauge('bitrate_with_padding', 'Bitrate of the trans
 bitrate_without_padding_gauge = Gauge('bitrate_without_padding', 'Bitrate of the transport stream excluding padding packets')
 
 # MPEG-2 transport stream URL
-url = os.environ['MPEG2_TS_URL']
+url = os.environ['VIDEO_URL']
 
 # Parameters for circular buffer
 buffer_size = 100
