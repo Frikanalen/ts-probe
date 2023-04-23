@@ -4,21 +4,26 @@ import requests
 import av
 import numpy as np
 from prometheus_client import start_http_server, Gauge
+from pyloudnorm import Meter
 from collections import deque
 from io import BytesIO
 
 # Initialize Prometheus metrics
-video_brightness_gauge = Gauge('average_video_brightness', 'Average video brightness')
-audio_amplitude_lufs_gauge = Gauge('average_audio_amplitude_lufs', 'Average audio amplitude in LUFS')
-audio_amplitude_dbfs_gauge = Gauge('average_audio_amplitude_dbfs', 'Average audio amplitude in dBFS')
-packet_rate_gauge = Gauge('transport_stream_packet_rate', 'Transport stream packet rate')
+video_brightness_gauge = Gauge('video_brightness', 'Average video brightness')
+audio_amplitude_lufs_gauge = Gauge('audio_amplitude_lufs', 'Average audio amplitude in LUFS')
+audio_amplitude_dbfs_gauge = Gauge('audio_amplitude_dbfs', 'Average audio amplitude in dBFS')
+packet_rate_gauge = Gauge('ts_packet_rate', 'Transport stream packet rate')
 decode_error_rate_gauge = Gauge('decode_error_rate', 'Decode error rate')
-motion_gauge = Gauge('motion', 'Amount of motion in the video buffer')
+motion_gauge = Gauge('video_motion', 'Amount of motion in the video buffer')
 bitrate_with_padding_gauge = Gauge('bitrate_with_padding', 'Bitrate of the transport stream including padding packets')
 bitrate_without_padding_gauge = Gauge('bitrate_without_padding', 'Bitrate of the transport stream excluding padding packets')
 
 # MPEG-2 transport stream URL
 url = os.environ['VIDEO_URL']
+
+sample_rate = 48000
+
+meter = Meter(sample_rate)
 
 # Parameters for circular buffer
 buffer_size = 100
@@ -33,12 +38,47 @@ def get_ts_pid(packet_data):
     return pid
 
 
-# Function to calculate LUFS and dBFS from raw audio samples
-def calculate_lufs_and_dbfs(audio_samples):
-    rms = np.sqrt(np.mean(np.square(audio_samples)))
-    dbfs = 20 * np.log10(rms)
-    lufs = dbfs - 23  # -23 LUFS is equivalent to 0 dBFS
-    return lufs, dbfs
+def get_dtype_and_scale_factor(sample_format):
+    if sample_format == 's16':
+        dtype = np.int16
+        scale_factor = np.iinfo(dtype).max
+    elif sample_format == 's32':
+        dtype = np.int32
+        scale_factor = np.iinfo(dtype).max
+    elif sample_format == 'fltp':
+        dtype = np.float32
+        scale_factor = 1.0
+    elif sample_format == 'dbl':
+        dtype = np.float64
+        scale_factor = 1.0
+    else:
+        raise ValueError(f"Unsupported sample format: {sample_format}")
+    return dtype, scale_factor
+
+def samples_to_numpy(audio_frame, dtype, scale_factor):
+    audio_samples = [np.frombuffer(plane, dtype) for plane in audio_frame.planes]
+    audio_samples = np.column_stack(audio_samples)
+    if scale_factor != 1.0:
+        audio_samples = audio_samples.astype(np.float32) / scale_factor
+    return audio_samples
+
+def calculate_lufs_and_dbfs(audio_frame):
+    dtype, scale_factor = get_dtype_and_scale_factor(audio_frame.format.name)
+    audio_samples = samples_to_numpy(audio_frame, dtype, scale_factor)
+
+    # Print the number of channels in the audio frame
+    num_channels = len(audio_frame.planes)
+    print(f"Number of audio channels: {num_channels}")
+
+    # Calculate LUFS
+    meter = Meter(audio_frame.rate, block_size=0.020)
+    lufs = meter.integrated_loudness(audio_samples)
+
+    # Calculate RMS in dBFS
+    rms_value = np.sqrt(np.mean(np.square(audio_samples)))
+    rms_dbfs = 20 * np.log10(rms_value)
+
+    return lufs, rms_dbfs
 
 # Function to calculate average video brightness
 def calculate_average_brightness(frame):
@@ -56,10 +96,12 @@ def calculate_motion(frame1, frame2):
 
 # Custom file-like object that wraps a requests.Response object
 class HTTPStream:
+    packets_received = 0
     def __init__(self, response):
         self.response = response
 
     def read(self, size):
+        self.packets_received += 1
         return self.response.raw.read(size)
 
     def close(self):
@@ -86,7 +128,7 @@ total_bytes_received = 0
 for packet in stream.demux():
     packet_count += 1
     total_bytes_received += packet.size
-    pid = get_ts_pid(packet.to_bytes())
+    pid = get_ts_pid(bytes(packet))
 
     if pid == 0x1FFF:
         padding_packet_count += 1
@@ -103,7 +145,7 @@ for packet in stream.demux():
                 prev_frame = frame
 
             elif isinstance(frame, av.audio.frame.AudioFrame):
-                lufs, dbfs = calculate_lufs_and_dbfs(frame.to_ndarray())
+                lufs, dbfs = calculate_lufs_and_dbfs(frame)
                 audio_amplitude_buffer.append((lufs, dbfs))
 
     except av.AVError as e:

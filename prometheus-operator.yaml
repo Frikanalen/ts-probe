@@ -18,10 +18,14 @@ apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
   name: ts-probe
+  namespace: beta
   labels:
     app: ts-probe
-  namespace: beta
+    release: prometheus-stack
 spec:
+  namespaceSelector:
+    matchNames:
+    - beta
   selector:
     matchLabels:
       app: ts-probe
@@ -83,6 +87,8 @@ kind: PrometheusRule
 metadata:
   name: ts-probe
   namespace: beta
+  labels:
+    release: prometheus-stack
 spec:
   groups:
   - name: ts-probe-alerts
