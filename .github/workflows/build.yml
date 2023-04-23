@@ -19,4 +19,4 @@ jobs:
       with:
         push: true
         tags: |
-          frikanalen/videomonitor:latest
+          frikanalen/ts-probe:latest
