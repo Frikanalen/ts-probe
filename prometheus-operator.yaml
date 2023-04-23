@@ -103,7 +103,7 @@ spec:
         description: "The average video brightness is below 0.1."
 
     - alert: NoMotionDetected
-      expr: motion_ratio == 0
+      expr: video_motion == 0
       for: 2m
       labels:
         severity: critical
@@ -111,13 +111,13 @@ spec:
         summary: "No motion detected"
         description: "No motion has been detected in the video for the last 2 minutes."
 
-    - alert: FrozenVideoDetected
+    - alert: FrozenTSDetected
       expr: ts_packet_rate == 0
       for: 2m
       labels:
         severity: critical
       annotations:
-        summary: "Frozen video detected"
+        summary: "Frozen TS detected"
         description: "No transport stream packets have been received for the last 2 minutes."
 
     - alert: QuietAudioDetected
