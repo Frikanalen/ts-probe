@@ -68,7 +68,6 @@ def calculate_lufs_and_dbfs(audio_frame):
 
     # Print the number of channels in the audio frame
     num_channels = len(audio_frame.planes)
-    print(f"Number of audio channels: {num_channels}")
 
     # Calculate LUFS
     meter = Meter(audio_frame.rate, block_size=0.020)
