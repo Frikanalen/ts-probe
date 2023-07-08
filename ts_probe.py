@@ -55,3 +55,4 @@ while True:
     except av.AVError as e:
         print(e)
         prom.decode_error_count.inc()
+        stream = av.open(url)
