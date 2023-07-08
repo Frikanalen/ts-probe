@@ -12,7 +12,7 @@ WORKDIR /app
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the script to the container
-COPY ts_probe.py /app/ts_probe.py
+COPY *.py /app/
 
 EXPOSE 8000
 
