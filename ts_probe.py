@@ -37,17 +37,13 @@ video_buffer = VideoBuffer()
 while True:
     try:
         for frame in stream.decode():
-            print("frame")
-
             if isinstance(frame, VideoFrame):
-                print("video frame")
                 prom.video_frame_count.inc()
                 video_buffer.append(frame)
                 prom.video_brightness_gauge.set(video_buffer.avg_brightness)
                 prom.motion_gauge.set(video_buffer.motion)
 
             elif isinstance(frame, AudioFrame):
-                print("audio frame")
                 audio_buffer.append(frame)
                 prom.audio_amplitude_lufs_gauge.set(audio_buffer.lufs())
                 prom.audio_amplitude_dbfs_gauge.set(audio_buffer.dbfs(0))
