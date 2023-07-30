@@ -31,7 +31,7 @@ spec:
       app: ts-probe
   endpoints:
   - port: web
-    interval: 15s
+    interval: 5s
     path: /metrics
     scheme: http
     tlsConfig:
@@ -94,7 +94,7 @@ spec:
   - name: ts-probe-alerts
     rules:
     - alert: DarkVideoDetected
-      expr: avg(video_brightness) < 0.1
+      expr: avg(tsprobe_video_brightness) < 0.1
       for: 2m
       labels:
         severity: warning
@@ -103,8 +103,8 @@ spec:
         description: "The average video brightness is below 0.1."
 
     - alert: NoMotionDetected
-      expr: video_motion == 0
-      for: 2m
+      expr: tsprobe_video_motion < 0.002
+      for: 1m
       labels:
         severity: critical
       annotations:
@@ -121,7 +121,7 @@ spec:
         description: "No transport stream packets have been received for the last 2 minutes."
 
     - alert: QuietAudioDetected
-      expr: avg(audio_amplitude_lufs) < -35.0
+      expr: avg(tsprobe_audio_amplitude_lufs) < -35.0
       for: 2m
       labels:
         severity: warning
