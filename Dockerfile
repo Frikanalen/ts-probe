@@ -1,5 +1,4 @@
-# Use Python 3.10 as the base image
-FROM python:3.10-slim-buster
+FROM python:3.12-slim-bookworm
 
 # Install FFmpeg and other dependencies
 RUN apt-get update && \

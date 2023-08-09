@@ -38,10 +38,10 @@ def run():
             for frame in stream.decode():
                 if isinstance(frame, VideoFrame):
                     prom.video_frame_count.inc()
-                    video_buffer.append(frame)
 
                     VIDEO_PROBE_INTERVAL -= 1
                     if VIDEO_PROBE_INTERVAL == 0:
+                        video_buffer.append(frame)
                         prom.video_brightness_gauge.set(
                             video_buffer.avg_brightness)
                         prom.motion_gauge.set(
