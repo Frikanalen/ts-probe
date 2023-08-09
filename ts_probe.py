@@ -7,34 +7,34 @@ from av import VideoFrame, AudioFrame
 from audiobuffer import AudioBuffer
 from videobuffer import VideoBuffer
 from prometheus import Prometheus
+from logger import log
 
 prom = Prometheus()
+DEFAULT_VIDEO_URL = 'http://simula.frikanalen.no:9094/frikanalen.ts'
+PROMETHEUS_PORT = 8000
+BUFFER_SIZE = 100
 
 # MPEG-2 transport stream URL
-url = os.environ.get(
-    'VIDEO_URL', 'http://simula.frikanalen.no:9094/frikanalen.ts')
+url = os.environ.get('VIDEO_URL', None)
 
-
-# Parameters for circular buffer
-BUFFER_SIZE = 100
-video_brightness_buffer = deque(maxlen=BUFFER_SIZE)
-audio_amplitude_buffer = deque(maxlen=BUFFER_SIZE)
-motion_buffer = deque(maxlen=BUFFER_SIZE)
-
-
-# Start Prometheus HTTP server
-prom.listen(8000)
-
-stream = av.open(url)
-
-padding_packet_count: int = 0
-START_TIME = time.time()
-total_bytes_received: int = 0
+if url is None:
+    url = DEFAULT_VIDEO_URL
+    log.warning("No video URL specified, using default: %s" % url)
 
 audio_buffer = AudioBuffer()
 video_buffer = VideoBuffer()
+padding_packet_count: int = 0
+total_bytes_received: int = 0
+START_TIME = time.time()
+
+# Start Prometheus HTTP server
+prom.listen(PROMETHEUS_PORT)
+
+log.info("Opening stream: %s" % url)
+stream = av.open(url)
 
 while True:
+    log.info("Stream is open")
     try:
         for frame in stream.decode():
             if isinstance(frame, VideoFrame):
@@ -49,6 +49,14 @@ while True:
                 prom.audio_amplitude_dbfs_gauge.set(audio_buffer.dbfs(0))
 
     except av.AVError as e:
-        print(e)
+        log.error(e)
         prom.decode_error_count.inc()
         stream = av.open(url)
+
+    except KeyboardInterrupt:
+        log.info("Keyboard interrupt")
+        break
+
+    except Exception as e:
+        log.error(e)
+        break

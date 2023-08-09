@@ -3,6 +3,7 @@ from collections import deque
 import numpy as np
 from pyloudnorm import Meter
 from av import AudioFrame
+from logger import log
 
 BUFFER_LENGTH_SECONDS = 1
 SAMPLE_RATE = 48000
@@ -57,11 +58,11 @@ class AudioBuffer():
         """ Returns the LUFS value for the given channel. """
 
         if (len(self.left_buffer) < BUFFER_SIZE or len(self.right_buffer) < BUFFER_SIZE):
-            print(
+            log.info(
                 f"Buffer {len(self.left_buffer)} too small to calculate LUFS")
             return 0
 
-        print("Calculating LUFS")
+        log.debug("Calculating LUFS")
         left_array = np.array(self.left_buffer)
         right_array = np.array(self.right_buffer)
         return self.meter.integrated_loudness(np.array([left_array, right_array]).T)

@@ -3,3 +3,5 @@ av
 numpy
 prometheus_client
 pyloudnorm
+structlog
+rich
