@@ -1,5 +1,3 @@
-""" AudioBuffer class for storing and analyzing audio samples. """""
-from collections import deque
 import numpy as np
 from pyloudnorm import Meter
 from av import AudioFrame
@@ -7,7 +5,15 @@ from logger import log
 
 BUFFER_LENGTH_SECONDS = 1
 SAMPLE_RATE = 48000
+NUM_CHANNELS = 2
 BUFFER_SIZE = BUFFER_LENGTH_SECONDS * SAMPLE_RATE
+
+SAMPLE_FORMATS = {
+    's16': (np.int16, np.iinfo(np.int16).max),
+    's32': (np.int32, np.iinfo(np.int32).max),
+    'fltp': (np.float32, 1.0),
+    'dbl': (np.float64, 1.0)
+}
 
 
 def _rms(buffer):
@@ -15,63 +21,42 @@ def _rms(buffer):
 
 
 def _samples_to_numpy(frame: AudioFrame, channel: int):
-    dtype, scale_factor = _get_dtype_and_scale_factor(frame.format.name)
+    dtype, scale_factor = SAMPLE_FORMATS.get(frame.format.name, (None, None))
+    if dtype is None:
+        raise ValueError(f"Unsupported sample format: {frame.format.name}")
     audio_samples = np.frombuffer(frame.planes[channel], dtype)
     if scale_factor != 1.0:
         audio_samples = audio_samples.astype(np.float32) / scale_factor
     return audio_samples
 
 
-def _get_dtype_and_scale_factor(sample_format):
-    if sample_format == 's16':
-        dtype = np.int16
-        scale_factor = np.iinfo(dtype).max
-    elif sample_format == 's32':
-        dtype = np.int32
-        scale_factor = np.iinfo(dtype).max
-    elif sample_format == 'fltp':
-        dtype = np.float32
-        scale_factor = 1.0
-    elif sample_format == 'dbl':
-        dtype = np.float64
-        scale_factor = 1.0
-    else:
-        raise ValueError(f"Unsupported sample format: {sample_format}")
-    return dtype, scale_factor
-
-
 class AudioBuffer():
     """ A circular buffer for audio samples. Includes LUFS and dBFS analysis. """
-    left_buffer = deque(maxlen=BUFFER_SIZE)
-    right_buffer = deque(maxlen=BUFFER_SIZE)
-    meter = Meter(SAMPLE_RATE)
+
+    def __init__(self):
+        self.buffer = np.zeros((NUM_CHANNELS, BUFFER_SIZE), dtype=np.float32)
+        self.meter = Meter(SAMPLE_RATE)
 
     def append(self, frame: AudioFrame):
         """ Appends a frame to the buffer."""
-        # Only stereo supported for now
         assert len(frame.planes) == 2
 
-        self.left_buffer.extend(_samples_to_numpy(frame, 0))
-        self.right_buffer.extend(_samples_to_numpy(frame, 1))
+        num_samples = frame.samples
+
+        self.buffer[0] = np.roll(self.buffer[0], shift=-num_samples)
+        self.buffer[0][-num_samples:] = _samples_to_numpy(frame, 0)
+        self.buffer[1] = np.roll(self.buffer[1], shift=-num_samples)
+        self.buffer[1][-num_samples:] = _samples_to_numpy(frame, 1)
 
     def lufs(self):
         """ Returns the LUFS value for the given channel. """
-
-        if (len(self.left_buffer) < BUFFER_SIZE or len(self.right_buffer) < BUFFER_SIZE):
-            log.info(
-                f"Buffer {len(self.left_buffer)} too small to calculate LUFS")
-            return 0
-
         log.debug("Calculating LUFS")
-        left_array = np.array(self.left_buffer)
-        right_array = np.array(self.right_buffer)
-        return self.meter.integrated_loudness(np.array([left_array, right_array]).T)
+        return self.meter.integrated_loudness(self.buffer.T)
 
     def dbfs(self, channel):
         """ Returns the RMS value in dBFS for the given channel. """
         if channel == 0:
-            return _rms(self.left_buffer)
+            return _rms(self.buffer[0])
         if channel == 1:
-            return _rms(self.right_buffer)
-
+            return _rms(self.buffer[1])
         raise ValueError(f"Unsupported channel: {channel}")

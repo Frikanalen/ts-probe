@@ -6,6 +6,11 @@ import sys
 if sys.stdout.isatty():
     structlog.configure(
         processors=[
+            structlog.processors.CallsiteParameterAdder(
+                [structlog.processors.CallsiteParameter.FILENAME,
+                 structlog.processors.CallsiteParameter.FUNC_NAME,
+                 structlog.processors.CallsiteParameter.LINENO],
+            ),
             structlog.stdlib.add_logger_name,
             structlog.stdlib.add_log_level,
             structlog.stdlib.PositionalArgumentsFormatter(),
