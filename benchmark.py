@@ -75,8 +75,8 @@ class Benchmarker:
     "Simple benchmarker that generates a trace json file"
     def __init__(self, run:bool):
         "Run: Whether to generate a trace or not"
+        self.run = run
         self.time_beginning = time.time()
-
         self.timings = {}
         self.metrics = {}
 
