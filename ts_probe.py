@@ -28,9 +28,6 @@ if BENCHMARK:
     VIDEO_PROBE_INTERVAL = 1
     AUDIO_PROBE_INTERVAL = 1
 
-# Start the clock (for benchmarking)
-START_TIME = time.time()
-
 # MPEG-2 transport stream URL
 url = os.environ.get('VIDEO_URL', None)
 if url is None:
@@ -60,6 +57,8 @@ def run():
     local_video_frame_count = 0 # Used by benchmark to track frame
     video_interval_counter = 0  # Used to track intervals
     audio_interval_counter = 0
+    # Start the clock (for benchmarking)
+    START_TIME = time.time()
     while True:
         frame_smp = bench.sample_begin("Frame")
         frame_decode_smp = bench.sample_begin("Frame-Decode")
