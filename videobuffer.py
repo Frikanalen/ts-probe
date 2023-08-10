@@ -49,6 +49,8 @@ class VideoBuffer():
         #return _avg_brightness(self.video_buffer)
         l = [f.brightness for f in self.video_buffer]
         nda = np.array(l, dtype="float")
+        if len(nda) == 0:
+            return 0
         return np.mean(nda) / 255
 
     @property
@@ -57,5 +59,7 @@ class VideoBuffer():
         #return _motion(self.video_buffer)
         l = [f.motion for f in self.video_buffer if f.has_motion]
         nda = np.array(l, dtype="float")
+        if len(nda) == 0:
+            return 0
         return np.mean(nda)
 
